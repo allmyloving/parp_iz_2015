@@ -1,6 +1,5 @@
 #include "stdafx.h"
 #include "simd.h"
-#include "stdint.h"
 
 float getMaxP(const float* x, const int size){
 	__m128 *px = (__m128*) x;

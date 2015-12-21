@@ -1,5 +1,7 @@
 #include "stdafx.h"
 
+float** malloc(int size);
+
 float* fill1d(const size_t size);
 
 float** fill2d(const size_t size);
