@@ -15,5 +15,7 @@
 #include <vector>
 #include "time.h"
 #include "intrin.h"
+#include "ppl.h"
 
 using namespace std;
+using namespace Concurrency;

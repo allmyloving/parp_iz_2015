@@ -1,7 +1,5 @@
 #include "stdafx.h"
 #include "util.h"
-#include "omp.h"
-#include <string>
 
 #define LLONG long long
 #define ULLONG unsigned LLONG
@@ -32,7 +30,7 @@ float getMaxP(float** x, int& iVal, int& jVal, int n){
 	float max = x[0][0];
 	int i, j;
 
-#pragma omp parallel for private(j) schedule(dynamic, CHUNK)
+#pragma omp parallel for firstprivate(j) schedule(dynamic, CHUNK)
 	for (i = 0; i < n; i++){
 		for (j = 0; j < n; j++){
 			if (x[i][j] > max){
@@ -67,6 +65,17 @@ void vectMulP(float** matrix, const float* vector, float* result, int length){
 	}
 }
 
+void vectMulP2(float** matrix, const float* vector, float* result, size_t length){
+	int j;
+	parallel_for(size_t(0), length, [&](size_t i){
+		float temp = 0;
+		for (size_t j = 0; j < length; j++){
+			temp += matrix[i][j] * vector[j];
+		}
+		result[i] = temp;
+	});
+}
+
 void matMul(float** matrix1, float** matrix2, float** result, size_t size){
 	for (size_t i = 0; i < size; i++){
 		for (size_t j = 0; j < size; j++){
@@ -91,6 +100,18 @@ void matMulP(float** matrix1, float** matrix2, float** result, int size){
 			result[i][j] = sum;
 		}
 	}
+}
+
+void matMulP2(float** matrix1, float** matrix2, float** result, size_t size){
+	parallel_for(size_t(0), size, [&](size_t i){
+		for (size_t j = 0; j < size; j++){
+			float sum = 0;
+			for (size_t k = 0; k < size; k++){
+				sum += matrix1[i][k] * matrix2[k][j];
+			}
+			result[i][j] = sum;
+		}
+	});
 }
 
 LLONG getElapsedTime(LARGE_INTEGER start, LARGE_INTEGER end, int size){
@@ -152,9 +173,10 @@ void testVectMul(const int size){
 	float* vector = fill1d(size);
 	float* res = (float*)malloc(size*sizeof(float));
 	float* res2 = (float*)malloc(size*sizeof(float));
+	float* res3 = (float*)malloc(size*sizeof(float));
 	char* denom = (size <= 32) ? "mcs" : "ms";
 
-	ULLONG time1 = ULLONG_MAX, time2 = ULLONG_MAX;
+	ULLONG time1 = ULLONG_MAX, time2 = ULLONG_MAX, time3 = ULLONG_MAX;
 	QueryPerformanceFrequency(&freq);
 	for (int i = 0; i < 5; i++){
 		QueryPerformanceCounter(&start);
@@ -188,6 +210,25 @@ void testVectMul(const int size){
 	cout << "time1/time2 ==>" << ((double)time1 / time2) << endl;
 	sprtr();
 
+	for (int i = 0; i < 5; i++){
+		QueryPerformanceCounter(&start);
+		vectMulP2(temp, vector, res3, size);
+		QueryPerformanceCounter(&::end);
+
+		ULLONG elapsed = getElapsedTime(start, ::end, size);
+		if (elapsed < time3){
+			time3 = elapsed;
+		}
+	}
+
+	printf("vector multiplication ppl time ==> %d", time3);
+	cout << denom << endl;
+
+	b = (areEqual(res, res3, size));
+	cout << "results are equal ==> " << (b ? "true" : "false") << endl;
+	cout << "time1/time3 ==>" << ((double)time1 / time3) << endl;
+	sprtr();
+
 	for (int i = 0; i < size; i++){
 		free(temp[i]);
 	}
@@ -203,10 +244,11 @@ void testMatMul(const int size){
 	float** temp2 = fill2d(size);
 	float** result = malloc(size);
 	float** result2 = malloc(size);
+	float** result3 = malloc(size);
 
 	char* denom = (size <= 32) ? "mcs" : "ms";
 
-	ULLONG time1 = ULLONG_MAX, time2 = ULLONG_MAX;
+	ULLONG time1 = ULLONG_MAX, time2 = ULLONG_MAX, time3 = ULLONG_MAX;
 	QueryPerformanceFrequency(&freq);
 	for (int i = 0; i < 5; i++){
 		QueryPerformanceCounter(&start);
@@ -238,7 +280,25 @@ void testMatMul(const int size){
 	bool b = (areEqual(result, result2, size));
 	cout << "results are equal ==> " << (b ? "true" : "false") << endl;
 	//print(result2, size);
+	sprtr();
 
+	for (int i = 0; i < 5; i++){
+		QueryPerformanceCounter(&start);
+		matMulP2(temp1, temp2, result3, size);
+		QueryPerformanceCounter(&::end);
+
+		ULLONG elapsed = getElapsedTime(start, ::end, size);
+		if (elapsed < time3){
+			time3 = elapsed;
+		}
+	}
+
+	printf("matrix multiplication ppl time ==> %d", time3);
+	cout << denom << endl;
+
+	b = (areEqual(result, result3, size));
+	cout << "results are equal ==> " << (b ? "true" : "false") << endl;
+	cout << "time1/time3 ==>" << ((double)time1 / time3) << endl;
 	sprtr();
 
 	for (int i = 0; i < size; i++){
